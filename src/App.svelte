@@ -9,7 +9,11 @@
 	//Global
 	let isMounted = false;
 	let Bots;
+	let msgInput;
 	let isClientAuthEnabled = false;
+	let message = [];
+	let isFirstConnection = true;
+
 	/**
 	 * SDK configuration settings
 	 *
@@ -46,7 +50,7 @@
 	
 	
 	/**
-	 *
+	 * onMount
 	 */
 	onMount(async () => {
 		initBot();
@@ -108,47 +112,77 @@
 	/**
 	 * initBot
 	*/
-	function initBot() {
-		console.log('[initBot]')
-		// Initialize SDK
-		if (isClientAuthEnabled) {
-			Bots = new window.WebSDK(chatWidgetSettings, generateToken);
-		} else {
-			Bots = new window.WebSDK(chatWidgetSettings);
+	async function initBot() {
+		console.log('[initBot]',Bots,window['Bots']);
+		if ((window['Bots']) && (window['Bots'].off)) {
+			//window['Bots'].endChat();
+			window['Bots'].off();
+			window['Bots'].disconnect();
+			window['Bots'].destroy();
 		}
 
-		let isFirstConnection = true;
-		//Bots.on(window.WebSDK.EVENT.WIDGET_OPENED, () => {
-			console.info('[Connecting...]')
-			if (isFirstConnection) {
-				Bots.connect().then(() => {
-					console.log('[Connection Successful]');
-					Bots.sendMessage('hi');
-				}).catch((reason) => {
-					console.log('[Connection failed]');
-					console.log(reason);
-				});
-
-				Bots.on('message:received', (msg) => {
-					console.log('msg',msg);
-
-				});
-
-				Bots.on('networkstatuschange', (state) => {
-					const deineState = [
-						'Connecting',
-						'Open',
-						'Closing',
-						'Closed',
-					] 
-					console.info('[Connection State]',`[${deineState[state]}][${state}]`)
-				});
-
-				isFirstConnection = false;
+			// Initialize SDK
+			if (isClientAuthEnabled) {
+				Bots = new window.WebSDK(chatWidgetSettings, generateToken);
+			} else {
+				Bots = new window.WebSDK(chatWidgetSettings);
 			}
-		//});
 
-		window['Bots'] = Bots;
+			//Bots.on(window.WebSDK.EVENT.WIDGET_OPENED, () => {
+				console.info('[Connecting...]')
+				if (isFirstConnection) {
+					Bots.connect().then(() => {
+						console.log('[Connection Successful]');
+						//Bots.sendMessage('hi');
+					}).catch((reason) => {
+						console.log('[Connection failed]');
+						console.log(reason);
+					});
+
+					Bots.on('message:received', (msg) => {
+						console.log('msg',msg);
+						if (msg.messagePayload.type !== 'sessionClosed') {
+							let updateMsg = message;
+							updateMsg.push(msg);
+							message = updateMsg;
+						}
+					});
+
+					Bots.on('networkstatuschange', (state) => {
+						const deineState = [
+							'Connecting',
+							'Open',
+							'Closing',
+							'Closed',
+						] 
+						console.info('[Connection State]',`[${deineState[state]}][${state}]`)
+					});
+
+					isFirstConnection = false;
+				}
+			//});.dsdfsdfff
+
+			window['Bots'] = Bots;
+	}
+
+	/**
+	 * 
+	 * @param e
+	 */
+	function sendMsgEnter(e) {
+		if (e.charCode === 13) sendMsg();
+	}
+
+	/**
+	 * 
+	 */
+	function sendMsg() {
+		
+		let updateMsg = message;
+		updateMsg.push({messagePayload:{text: msgInput, type: "text"}});
+		message = updateMsg;
+		Bots.sendMessage(msgInput);
+		msgInput = '';
 	}
 
 </script>
@@ -156,21 +190,35 @@
 <!-- Wrapper -->
 <section>
 	<article>
-		<div class="container mx-auto">
-			<div class="max-w-2xl border rounded">
+		<div class="container mx-auto flex justify-center">
+			<div class=" border rounded w-[500px]">
 			  <div>
 				<div class="w-full">
 				  <div class="relative flex items-center p-3 border-b border-gray-300">
-					<img class="object-cover w-10 h-10 rounded-full"
-					  src="https://cdn.pixabay.com/photo/2018/01/15/07/51/woman-3083383__340.jpg" alt="username" />
-					<span class="block ml-2 font-bold text-gray-600">Emma</span>
-					<span class="absolute w-3 h-3 bg-green-600 rounded-full left-10 top-3">
-					</span>
+					<b>Digital Assistant Demo</b>
 				  </div>
 				  <div class="relative w-full p-6 overflow-y-auto h-[40rem]">
 	  
 					<ul class="space-y-2">
-					  <li class="flex justify-start">
+						{#if ((message) && (message.length > 0))}
+							{#each message as msg, i}
+								{#if (msg.source === 'BOT')}
+								<li class="flex justify-start">
+									<div class="relative max-w-xl px-4 py-2 text-gray-700 rounded shadow">
+										<span class="block">{msg.messagePayload.text}</span>
+									</div>
+								</li>
+								{:else}
+								<li class="flex justify-end">
+								  <div class="relative max-w-xl px-4 py-2 text-gray-700 bg-gray-100 rounded shadow">
+									<span class="block">{msg.messagePayload.text}</span>
+								  </div>
+								</li>
+								{/if}
+
+							{/each}
+						{/if}
+					  <!--<li class="flex justify-start">
 						<div class="relative max-w-xl px-4 py-2 text-gray-700 rounded shadow">
 						  <span class="block">Hi</span>
 						</div>
@@ -189,7 +237,7 @@
 						<div class="relative max-w-xl px-4 py-2 text-gray-700 rounded shadow">
 						  <span class="block">Lorem ipsum dolor sit, amet consectetur adipisicing elit. </span>
 						</div>
-					  </li>
+					  </li>-->
 					</ul>
 	  
 				  </div>
@@ -211,7 +259,10 @@
 					  </svg>
 					</button>
 	  
-					<input type="text" placeholder="Message"
+					<input 
+						on:keypress={sendMsgEnter}
+						bind:value="{msgInput}"
+						type="text" placeholder="Message"
 					  class="block w-full py-2 pl-4 mx-3 bg-gray-100 rounded-full outline-none focus:text-gray-700"
 					  name="message" required />
 					<button>
@@ -221,7 +272,7 @@
 						  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
 					  </svg>
 					</button>
-					<button type="submit">
+					<button type="submit" on:click="{sendMsg}">
 					  <svg class="w-5 h-5 text-gray-500 origin-center transform rotate-90" xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 20 20" fill="currentColor">
 						<path
